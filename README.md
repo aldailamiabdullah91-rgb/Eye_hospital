@@ -1,36 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TaskFlow — AI-Powered Task Management
+
+TaskFlow is a task management platform designed for distributed remote teams of 5-50 people. It integrates with Slack for seamless task creation and uses AI to automatically prioritize work based on urgency, impact, dependencies, and team capacity.
+
+## Features
+
+- **AI Priority Scoring** — Composite scoring based on urgency (deadline proximity) × impact (stakeholder weight) × dependency chain depth. Transparent reasoning explains why each task is ranked.
+- **Natural Language Task Creation** — Type "Fix auth bug for Sarah by Friday" and AI extracts the title, assignee, due date, and tags automatically.
+- **Slack Integration** — Create tasks from Slack thread replies using ⚡ emoji reaction or `/task` command. Receive daily digests and deadline reminders via Slack DM.
+- **Daily AI Digest** — Each team member gets a personalized summary at 9am local time with their top 3 priorities, blockers, and upcoming deadlines.
+- **Kanban Dashboard** — Priority-sorted board (To Do / In Progress / Done) with drag-and-drop, filters by assignee, project, and priority tier.
+- **Dependency Visualization** — DAG view showing task blocking relationships and chains to escalate.
+- **Due Date Tracking** — Automated Slack reminders at 24h and 2h before deadline.
+- **Dark Mode by Default** — Built for developers who live in terminals.
+- **Keyboard-First** — `Ctrl+K` for quick task creation, full keyboard navigation.
+
+## Tech Stack
+
+- **Frontend:** Next.js 14 (App Router) + Tailwind CSS + shadcn/ui
+- **Backend:** Next.js API Routes + tRPC for type-safe API layer
+- **Database:** Supabase (Postgres + Auth + Realtime) — currently uses in-memory mock data for demo
+- **AI:** Claude API for task parsing, priority scoring, and digest generation
+- **Integrations:** Slack API (Events API + Web API)
+- **Hosting:** Vercel (frontend) + Supabase (backend/db)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/aldailamiabdullah91-rgb/Eye_hospital.git
+cd Eye_hospital
+
+# Install dependencies
+npm install
+
+# Copy environment variables
+cp .env.local.example .env.local
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Copy `.env.local.example` to `.env.local` and fill in your values:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+# Supabase (required for production, mock data used for demo)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-## Learn More
+# AI (required for natural language parsing)
+ANTHROPIC_API_KEY=your-anthropic-api-key
 
-To learn more about Next.js, take a look at the following resources:
+# Slack (required for Slack integration)
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+SLACK_SIGNING_SECRET=your-slack-signing-secret
+SLACK_BOT_TOKEN=your-slack-bot-token
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> **Note:** The app works without any API keys using mock data and a built-in priority scoring algorithm. AI features (natural language parsing, digest generation) require an Anthropic API key.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database Schema
 
-## Deploy on Vercel
+### Core Tables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **teams** — `id`, `name`, `slack_workspace_id`, `created_at`
+- **users** — `id`, `email`, `name`, `team_id`, `slack_user_id`, `timezone`, `role`, `avatar_url`
+- **tasks** — `id`, `title`, `description`, `assignee_id`, `creator_id`, `team_id`, `priority_score`, `status`, `due_date`, `created_from`, `parent_task_id`, `tags`
+- **priority_logs** — `id`, `task_id`, `score`, `factors_json`, `computed_at`
+- **integrations** — `id`, `team_id`, `provider`, `access_token`, `config_json`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/tasks` | Create task (accepts natural language or structured) |
+| PATCH | `/api/tasks/:id` | Update task status, assignment, priority override |
+| GET | `/api/tasks?team_id=&sort=priority` | List tasks with AI-sorted priority |
+| POST | `/api/slack/events` | Slack event webhook (task creation, reactions) |
+| GET | `/api/digest/:userId` | Generate daily priority digest |
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── (auth)/          # Authentication pages
+│   ├── (dashboard)/     # Protected dashboard pages
+│   │   ├── dashboard/   # Main kanban board
+│   │   ├── tasks/[id]/  # Task detail view
+│   │   ├── digest/      # Daily digest view
+│   │   ├── dependencies/# Dependency graph
+│   │   └── settings/    # Team & notification settings
+│   ├── api/
+│   │   ├── trpc/        # tRPC API handler
+│   │   ├── slack/       # Slack webhook endpoints
+│   │   └── digest/      # Digest generation API
+│   └── page.tsx         # Landing page
+├── components/
+│   ├── ui/              # shadcn/ui components
+│   ├── kanban-board.tsx  # Drag-and-drop kanban
+│   ├── task-card.tsx     # Task card component
+│   ├── create-task-dialog.tsx
+│   ├── command-palette.tsx  # Ctrl+K quick create
+│   └── sidebar.tsx
+├── lib/
+│   ├── ai.ts            # Claude API integration
+│   ├── supabase.ts      # Supabase client
+│   ├── trpc.ts          # tRPC client
+│   ├── mock-data.ts     # Demo data store
+│   └── utils.ts         # Utility functions
+├── server/
+│   ├── trpc.ts          # tRPC server setup
+│   └── routers/         # tRPC routers
+└── types/
+    └── database.ts      # TypeScript types
+```
+
+## License
+
+MIT
